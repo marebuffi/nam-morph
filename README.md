@@ -5,6 +5,8 @@ Load two `.nam` profiles, set the blend with a fader, and render a new profile t
 in between — a 50/50 of a clean and a crunch capture, a British/American hybrid, whatever
 you can dream up.
 
+**🎛️ Live demo:** [groovelab-fx.com/nam-morph.html](https://groovelab-fx.com/nam-morph.html) — a working example, right in your browser.
+
 ![NAM Morph screenshot](docs/screenshot.png)
 
 ## Why it works
@@ -30,6 +32,7 @@ of producing a broken file.
 
 It's a single self-contained HTML file. No install, no dependencies, no build.
 
+- **Online:** use the live demo at [groovelab-fx.com/nam-morph.html](https://groovelab-fx.com/nam-morph.html).
 - **Locally:** download `nam-morph.html` and double-click it.
 - **Hosted:** drop the file on any static host.
 
