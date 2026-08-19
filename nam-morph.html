@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NAM Morph</title>
+<style>
+  :root{
+    --tolex:#131217;
+    --chassis:#1d1c23;
+    --chassis-hi:#26252d;
+    --line:#33323b;
+    --silk:#e8e2d0;
+    --dim:#8a8794;
+    --ch-a:#7fd069;   /* rhythm channel LED */
+    --ch-b:#e5484d;   /* lead channel LED */
+    --ok:#7fd069;
+    --err:#ffb224;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--tolex);
+    background-image:radial-gradient(ellipse 90% 60% at 50% -10%, #23222b 0%, transparent 60%);
+    color:var(--silk);
+    font-family:system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex;align-items:center;justify-content:center;
+    padding:24px 16px;
+  }
+  .rack{
+    width:100%;max-width:760px;
+    background:linear-gradient(180deg,var(--chassis-hi) 0%,var(--chassis) 8%,var(--chassis) 92%,#18171d 100%);
+    border:1px solid var(--line);
+    border-radius:10px;
+    box-shadow:0 24px 60px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.05);
+    position:relative;
+    padding:26px 30px 30px;
+  }
+  /* corner screws */
+  .screw{position:absolute;width:11px;height:11px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#5c5b64,#2a2930 70%);
+    box-shadow:inset 0 -1px 2px rgba(0,0,0,.7);}
+  .screw::after{content:"";position:absolute;left:1px;right:1px;top:50%;height:1.5px;
+    background:#131217;transform:rotate(38deg)}
+  .screw.tl{top:10px;left:10px}.screw.tr{top:10px;right:10px;}
+  .screw.bl{bottom:10px;left:10px}.screw.br{bottom:10px;right:10px}
+
+  header{display:flex;align-items:baseline;justify-content:space-between;
+    border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:22px}
+  .wordmark{
+    font-family:Haettenschweiler,"Arial Narrow","Franklin Gothic Medium",Impact,sans-serif;
+    font-size:34px;line-height:1;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--silk);
+  }
+  .wordmark span{color:var(--ch-b)}
+  .tagline{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+
+  .intro{font-size:13px;line-height:1.6;color:var(--dim);margin:-6px 0 22px}
+  .intro strong{color:var(--silk);font-weight:600}
+
+  .channels{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:560px){.channels{grid-template-columns:1fr}}
+
+  .slot{
+    border:1px dashed var(--line);
+    border-radius:8px;
+    padding:16px;
+    min-height:118px;
+    cursor:pointer;
+    transition:border-color .15s, background-color .15s;
+    position:relative;
+    background:rgba(0,0,0,.18);
+  }
+  .slot:hover,.slot:focus-visible{border-color:var(--dim)}
+  .slot:focus-visible{outline:2px solid var(--silk);outline-offset:2px}
+  .slot.drag{background:rgba(255,255,255,.05)}
+  .slot.loaded{border-style:solid;cursor:default}
+  .slot.loaded[data-ch="A"]{border-color:var(--ch-a)}
+  .slot.loaded[data-ch="B"]{border-color:var(--ch-b)}
+  .ch-label{display:flex;align-items:center;gap:8px;
+    font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
+  .led{width:8px;height:8px;border-radius:50%;background:#3a3942;transition:background .2s, box-shadow .2s}
+  .slot.loaded[data-ch="A"] .led{background:var(--ch-a);box-shadow:0 0 8px var(--ch-a)}
+  .slot.loaded[data-ch="B"] .led{background:var(--ch-b);box-shadow:0 0 8px var(--ch-b)}
+  .slot .hint{color:var(--dim);font-size:13px;line-height:1.5}
+  .slot .fname{font-size:14px;font-weight:600;word-break:break-all;margin-bottom:6px}
+  .slot .fmeta{font-family:Consolas,Menlo,monospace;font-size:11px;color:var(--dim);line-height:1.6}
+  .slot .swap{position:absolute;top:12px;right:12px;font-size:11px;letter-spacing:.08em;
+    background:none;border:1px solid var(--line);border-radius:4px;color:var(--dim);
+    padding:3px 8px;cursor:pointer;text-transform:uppercase}
+  .slot .swap:hover{color:var(--silk);border-color:var(--dim)}
+  .slot .swap:focus-visible{outline:2px solid var(--silk);outline-offset:2px}
+  .slot input[type=file]{display:none}
+
+  /* ---- crossfade fader: the one loud element ---- */
+  .fader-sec{margin:28px 0 6px;opacity:.35;pointer-events:none;transition:opacity .25s}
+  .fader-sec.armed{opacity:1;pointer-events:auto}
+  .mix-readout{display:flex;justify-content:center;align-items:baseline;gap:14px;
+    font-family:Consolas,Menlo,monospace;margin-bottom:14px}
+  .mix-readout .pct{font-size:34px;font-weight:700}
+  .mix-readout .pct.a{color:var(--ch-a)}
+  .mix-readout .pct.b{color:var(--ch-b)}
+  .mix-readout .sep{color:var(--dim);font-size:20px}
+  .fader-row{display:flex;align-items:center;gap:14px}
+  .fader-row .end{font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--dim);width:64px;flex-shrink:0}
+  .fader-row .end.b{text-align:right}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;flex:1;height:34px;background:transparent;cursor:pointer}
+  input[type=range]:focus-visible{outline:2px solid var(--silk);outline-offset:4px;border-radius:4px}
+  input[type=range]::-webkit-slider-runnable-track{
+    height:8px;border-radius:4px;
+    background:linear-gradient(90deg,var(--ch-a),#4a4630 50%,var(--ch-b));
+    box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}
+  input[type=range]::-moz-range-track{
+    height:8px;border-radius:4px;
+    background:linear-gradient(90deg,var(--ch-a),#4a4630 50%,var(--ch-b));
+    box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:22px;height:30px;margin-top:-11px;border-radius:4px;
+    background:linear-gradient(180deg,#4c4b55,#26252d);
+    border:1px solid #0d0c10;
+    box-shadow:0 3px 8px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.15);
+    background-image:linear-gradient(180deg,#4c4b55,#26252d),linear-gradient(#e8e2d0,#e8e2d0);
+    background-clip:border-box}
+  input[type=range]::-webkit-slider-thumb{position:relative}
+  input[type=range]::-moz-range-thumb{
+    width:22px;height:30px;border-radius:4px;
+    background:linear-gradient(180deg,#4c4b55,#26252d);
+    border:1px solid #0d0c10;
+    box-shadow:0 3px 8px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.15)}
+  .name-labels{display:flex;justify-content:space-between;margin-top:8px;padding:0 78px}
+  @media (max-width:560px){.name-labels{padding:0}}
+  .name-labels div{font-family:Consolas,Menlo,monospace;font-size:11px;color:var(--dim);
+    max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  .out{margin-top:26px;border-top:1px solid var(--line);padding-top:20px;
+    display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+  .out label{display:block;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--dim);margin-bottom:6px}
+  .out .field{flex:1;min-width:220px}
+  .out input[type=text]{
+    width:100%;background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:6px;
+    color:var(--silk);font-family:Consolas,Menlo,monospace;font-size:13px;padding:10px 12px}
+  .out input[type=text]:focus-visible{outline:2px solid var(--silk);outline-offset:1px}
+  #render{
+    background:linear-gradient(180deg,#3a3942,#26252d);
+    color:var(--silk);border:1px solid #0d0c10;border-radius:6px;
+    font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;
+    padding:12px 22px;cursor:pointer;
+    box-shadow:0 3px 8px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.12);
+    transition:transform .06s}
+  #render:hover:not(:disabled){border-color:var(--dim)}
+  #render:active:not(:disabled){transform:translateY(1px)}
+  #render:focus-visible{outline:2px solid var(--silk);outline-offset:2px}
+  #render:disabled{opacity:.35;cursor:not-allowed}
+
+  #status{margin-top:16px;font-size:13px;line-height:1.5;min-height:20px}
+  #status.ok{color:var(--ok)}
+  #status.err{color:var(--err)}
+  footer{margin-top:18px;font-size:11px;color:#57555f;letter-spacing:.04em}
+  @media (prefers-reduced-motion: reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+<main class="rack">
+  <div class="screw tl"></div><div class="screw tr"></div>
+  <div class="screw bl"></div><div class="screw br"></div>
+
+  <header>
+    <h1 class="wordmark">NAM<span>&middot;</span>MORPH</h1>
+    <div class="tagline">Profile Crossfader</div>
+  </header>
+
+  <p class="intro">A .nam profile is a neural capture of an amp &mdash; thousands of learned numbers
+    that shape the tone. Load two captures from the same pack and the fader blends those numbers
+    point by point, taking you smoothly from one tone into the other.
+    <strong>Render</strong> saves the mix as a new .nam you can load in any NAM player.</p>
+
+  <div class="channels">
+    <div class="slot" data-ch="A" id="slotA" tabindex="0" role="button" aria-label="Load profile into channel A">
+      <div class="ch-label"><span class="led"></span>Channel A</div>
+      <div class="slot-body"><p class="hint">Drop a .nam file here,<br>or click to browse.</p></div>
+      <input type="file" accept=".nam,application/json">
+    </div>
+    <div class="slot" data-ch="B" id="slotB" tabindex="0" role="button" aria-label="Load profile into channel B">
+      <div class="ch-label"><span class="led"></span>Channel B</div>
+      <div class="slot-body"><p class="hint">Drop a .nam file here,<br>or click to browse.</p></div>
+      <input type="file" accept=".nam,application/json">
+    </div>
+  </div>
+
+  <section class="fader-sec" id="faderSec" aria-label="Blend control">
+    <div class="mix-readout" aria-hidden="true">
+      <span class="pct a" id="pctA">50</span><span class="sep">/</span><span class="pct b" id="pctB">50</span>
+    </div>
+    <div class="fader-row">
+      <div class="end">100% A</div>
+      <input type="range" id="fader" min="0" max="100" value="50" step="1"
+             aria-label="Blend: percentage of channel B">
+      <div class="end b">100% B</div>
+    </div>
+    <div class="name-labels"><div id="nameA"></div><div id="nameB"></div></div>
+  </section>
+
+  <div class="out">
+    <div class="field">
+      <label for="outName">Output name</label>
+      <input type="text" id="outName" spellcheck="false" placeholder="Load both channels first">
+    </div>
+    <button id="render" disabled>Render .nam</button>
+  </div>
+  <p id="status" role="status"></p>
+
+  <footer>Runs entirely in your browser &mdash; your profiles are never uploaded anywhere.</footer>
+</main>
+
+<script>
+"use strict";
+
+/* ---------------- core (UI-independent, testable as window.morphCore) ---------------- */
+
+// A .nam file is either a plain model or a SlimmableContainer of submodels.
+function getModels(nam){
+  if (nam.architecture === "SlimmableContainer")
+    return nam.config.submodels.map(s => s.model);
+  return [nam];
+}
+
+// Architecture signature: config with the learned head_scale scalar removed,
+// so two captures of the same shape compare equal.
+function configSignature(model){
+  const cfg = JSON.parse(JSON.stringify(model.config));
+  stripHeadScale(cfg);
+  return JSON.stringify({arch: model.architecture, cfg});
+}
+function stripHeadScale(node){
+  if (Array.isArray(node)) { node.forEach(stripHeadScale); return; }
+  if (node && typeof node === "object"){
+    if ("head_scale" in node) delete node.head_scale;
+    Object.values(node).forEach(stripHeadScale);
+  }
+}
+
+function checkCompatible(a, b){
+  const ma = getModels(a), mb = getModels(b);
+  if (ma.length !== mb.length)
+    return "These profiles have different structures (" + ma.length + " vs " + mb.length + " submodels). Pick two from the same pack.";
+  for (let i = 0; i < ma.length; i++){
+    if (configSignature(ma[i]) !== configSignature(mb[i]))
+      return "These profiles use different network architectures, so their weights can't be blended. Pick two from the same pack.";
+    if (ma[i].weights.length !== mb[i].weights.length)
+      return "Weight counts differ (" + ma[i].weights.length + " vs " + mb[i].weights.length + "). Pick two from the same pack.";
+  }
+  return null; // compatible
+}
+
+const lerp = (x, y, t) => x + (y - x) * t;
+
+// t = fraction of B (0 => pure A, 1 => pure B). Returns a new .nam object.
+function morph(a, b, t, outName){
+  const out = JSON.parse(JSON.stringify(a));
+  const oa = getModels(out), mb = getModels(b);
+  const ma = getModels(a);
+  for (let i = 0; i < oa.length; i++){
+    const wa = ma[i].weights, wb = mb[i].weights;
+    const w = new Array(wa.length);
+    for (let k = 0; k < wa.length; k++) w[k] = lerp(wa[k], wb[k], t);
+    oa[i].weights = w;
+    if (typeof oa[i].config.head_scale === "number" && typeof mb[i].config.head_scale === "number")
+      oa[i].config.head_scale = lerp(ma[i].config.head_scale, mb[i].config.head_scale, t);
+    blendMeta(oa[i].metadata, ma[i].metadata, mb[i].metadata, t);
+  }
+  blendMeta(out.metadata, a.metadata, b.metadata, t);
+  if (out.metadata) out.metadata.name = outName;
+  return out;
+}
+function blendMeta(dst, ma, mb, t){
+  if (!dst || !ma || !mb) return;
+  for (const k of ["loudness", "gain"])
+    if (typeof ma[k] === "number" && typeof mb[k] === "number") dst[k] = lerp(ma[k], mb[k], t);
+}
+
+window.morphCore = {getModels, configSignature, checkCompatible, morph};
+
+/* ---------------- UI ---------------- */
+
+const state = {A: null, B: null}; // {name, json}
+const $ = id => document.getElementById(id);
+const fader = $("fader"), status = $("status"), render = $("render"), outName = $("outName");
+let nameEdited = false;
+
+function baseName(f){ return f.replace(/\.nam$/i, ""); }
+
+function setStatus(msg, cls){ status.textContent = msg || ""; status.className = cls || ""; }
+
+function loadFile(ch, file){
+  file.text().then(text => {
+    let json;
+    try { json = JSON.parse(text); }
+    catch(e){ setStatus("Channel " + ch + ": that file isn't valid JSON, so it isn't a readable .nam profile.", "err"); return; }
+    if (!json.architecture || !json.config){
+      setStatus("Channel " + ch + ": no model found inside this file. Load a NAM profile (.nam).", "err"); return;
+    }
+    state[ch] = {name: baseName(file.name), json};
+    renderSlot(ch);
+    refresh();
+  });
+}
+
+function renderSlot(ch){
+  const slot = $("slot" + ch), s = state[ch];
+  slot.classList.add("loaded");
+  const meta = s.json.metadata || {};
+  const models = getModels(s.json);
+  const weights = models.reduce((n, m) => n + m.weights.length, 0);
+  slot.querySelector(".slot-body").innerHTML =
+    '<div class="fname"></div>' +
+    '<div class="fmeta">' + models.length + ' submodel' + (models.length > 1 ? 's' : '') +
+    ' &middot; ' + weights.toLocaleString() + ' weights' +
+    (typeof meta.loudness === "number" ? ' &middot; ' + meta.loudness.toFixed(1) + ' dB' : '') +
+    '</div>' +
+    '<button class="swap" type="button">Change</button>';
+  slot.querySelector(".fname").textContent = s.name;
+  slot.querySelector(".swap").addEventListener("click", e => {
+    e.stopPropagation();
+    slot.querySelector("input[type=file]").click();
+  });
+}
+
+function defaultName(){
+  const t = fader.valueAsNumber;
+  return state.A.name + "-x-" + state.B.name + "-" + (100 - t) + "-" + t;
+}
+
+function refresh(){
+  const both = state.A && state.B;
+  $("faderSec").classList.toggle("armed", !!both);
+  $("nameA").textContent = state.A ? state.A.name : "";
+  $("nameB").textContent = state.B ? state.B.name : "";
+  const t = fader.valueAsNumber;
+  $("pctA").textContent = 100 - t;
+  $("pctB").textContent = t;
+  if (!both){ render.disabled = true; return; }
+
+  const problem = checkCompatible(state.A.json, state.B.json);
+  if (problem){ setStatus(problem, "err"); render.disabled = true; return; }
+  setStatus("Profiles are compatible. Set the blend and render.", "ok");
+  render.disabled = false;
+  if (!nameEdited) outName.value = defaultName();
+}
+
+for (const ch of ["A", "B"]){
+  const slot = $("slot" + ch);
+  const input = slot.querySelector("input[type=file]");
+  slot.addEventListener("click", () => { if (!slot.classList.contains("loaded")) input.click(); });
+  slot.addEventListener("keydown", e => {
+    if ((e.key === "Enter" || e.key === " ") && !slot.classList.contains("loaded")){ e.preventDefault(); input.click(); }
+  });
+  input.addEventListener("change", () => { if (input.files[0]) loadFile(ch, input.files[0]); input.value = ""; });
+  slot.addEventListener("dragover", e => { e.preventDefault(); slot.classList.add("drag"); });
+  slot.addEventListener("dragleave", () => slot.classList.remove("drag"));
+  slot.addEventListener("drop", e => {
+    e.preventDefault(); slot.classList.remove("drag");
+    const f = e.dataTransfer.files[0];
+    if (f) loadFile(ch, f);
+  });
+}
+
+fader.addEventListener("input", refresh);
+outName.addEventListener("input", () => { nameEdited = outName.value.trim() !== ""; });
+
+render.addEventListener("click", () => {
+  const t = fader.valueAsNumber / 100;
+  const name = (outName.value.trim() || defaultName()).replace(/[\\/:*?"<>|]/g, "_");
+  const result = morph(state.A.json, state.B.json, t, name);
+  const blob = new Blob([JSON.stringify(result)], {type: "application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name + ".nam";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  setStatus("Rendered " + name + ".nam â€” check your downloads folder.", "ok");
+});
+</script>
+</body>
+</html>
