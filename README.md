@@ -63,3 +63,7 @@ node test/morph.test.js path/to/A.nam path/to/B.nam
 It verifies compatibility detection, exact midpoint interpolation, asymmetric blends,
 endpoint identity (0% and 100% reproduce the originals bit-for-bit), metadata blending,
 and JSON round-tripping.
+
+## License
+
+[MIT](LICENSE)
